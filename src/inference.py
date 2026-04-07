@@ -574,7 +574,17 @@ def _load_hgt_model(
     dataset: RawDataset,
     graph: Any,
 ) -> DrugDiseaseHGT:
-    model_config = payload.get("model_config", {})
+    model_config = dict(payload.get("model_config", {}))
+
+    # Backward compatibility: older checkpoints may save `hidden_dims`
+    # while current HGTModelConfig expects `hidden_dim`.
+    if "hidden_dim" not in model_config and "hidden_dims" in model_config:
+        legacy_hidden = model_config.pop("hidden_dims")
+        if isinstance(legacy_hidden, (list, tuple)):
+            model_config["hidden_dim"] = int(legacy_hidden[0]) if len(legacy_hidden) > 0 else 128
+        else:
+            model_config["hidden_dim"] = int(legacy_hidden)
+
     input_dims = payload.get("input_dims", dataset.feature_dims)
     model = DrugDiseaseHGT(
         metadata=graph.metadata(),
