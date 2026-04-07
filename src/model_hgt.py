@@ -26,6 +26,7 @@ class HGTModelConfig:
     num_heads: int = 4
     dropout: float = 0.2
     decoder_hidden_dims: tuple[int, ...] = (256, 128)
+    decoder_mode: str = "product"
     activation: str = "gelu"
     use_layer_norm: bool = True
 
@@ -80,7 +81,7 @@ class DrugDiseaseHGT(nn.Module):
 
         activation = _make_activation(config.activation)
         decoder_layers: list[nn.Module] = []
-        decoder_in_dim = config.hidden_dim
+        decoder_in_dim = _decoder_input_dim(config.hidden_dim, config.decoder_mode)
         for hidden_dim in config.decoder_hidden_dims:
             decoder_layers.append(nn.Linear(decoder_in_dim, hidden_dim))
             decoder_layers.append(activation)
@@ -130,7 +131,11 @@ class DrugDiseaseHGT(nn.Module):
 
         drug_embeddings = embeddings["drug"][drug_index]
         disease_embeddings = embeddings["disease"][disease_index]
-        pair_embeddings = drug_embeddings * disease_embeddings
+        pair_embeddings = _build_pair_embeddings(
+            drug_embeddings,
+            disease_embeddings,
+            mode=self.config.decoder_mode,
+        )
         logits = self.decoder(pair_embeddings)
         return logits.squeeze(-1)
 
@@ -193,9 +198,45 @@ def summarize_hgt_model(model: DrugDiseaseHGT) -> dict[str, Any]:
         "num_heads": model.config.num_heads,
         "dropout": model.config.dropout,
         "decoder_hidden_dims": list(model.config.decoder_hidden_dims),
+        "decoder_mode": model.config.decoder_mode,
         "activation": model.config.activation,
         "use_layer_norm": model.config.use_layer_norm,
     }
+
+
+def _decoder_input_dim(hidden_dim: int, mode: str) -> int:
+    normalized = mode.strip().lower()
+    if normalized == "product":
+        return hidden_dim
+    if normalized == "concat":
+        return hidden_dim * 2
+    if normalized == "hybrid":
+        return hidden_dim * 4
+    raise ValueError(f"Unsupported decoder_mode '{mode}'.")
+
+
+def _build_pair_embeddings(
+    drug_embeddings: torch.Tensor,
+    disease_embeddings: torch.Tensor,
+    *,
+    mode: str,
+) -> torch.Tensor:
+    normalized = mode.strip().lower()
+    if normalized == "product":
+        return drug_embeddings * disease_embeddings
+    if normalized == "concat":
+        return torch.cat((drug_embeddings, disease_embeddings), dim=-1)
+    if normalized == "hybrid":
+        return torch.cat(
+            (
+                drug_embeddings,
+                disease_embeddings,
+                drug_embeddings * disease_embeddings,
+                torch.abs(drug_embeddings - disease_embeddings),
+            ),
+            dim=-1,
+        )
+    raise ValueError(f"Unsupported decoder_mode '{mode}'.")
 
 
 def _make_activation(name: str) -> nn.Module:

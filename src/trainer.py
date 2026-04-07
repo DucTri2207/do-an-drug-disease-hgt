@@ -9,6 +9,7 @@ from typing import Any
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
 try:
@@ -37,6 +38,9 @@ class TrainerConfig:
     monitor_mode: str = "max"
     checkpoint_path: str | Path | None = None
     num_workers: int = 0
+    loss_name: str = "bce"
+    pos_weight: float | None = None
+    focal_gamma: float = 2.0
     artifact_metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -91,7 +95,7 @@ def train_baseline_model(
         num_workers=config.num_workers,
     )
 
-    criterion = nn.BCEWithLogitsLoss()
+    criterion = _make_loss_fn(config, device)
     optimizer = torch.optim.Adam(
         model.parameters(),
         lr=config.learning_rate,
@@ -290,7 +294,7 @@ def train_hgt_model(
         num_workers=config.num_workers,
     )
 
-    criterion = nn.BCEWithLogitsLoss()
+    criterion = _make_loss_fn(config, device)
     optimizer = torch.optim.Adam(
         model.parameters(),
         lr=config.learning_rate,
@@ -531,6 +535,41 @@ def _train_hgt_epoch(
         total_samples += batch_size_actual
 
     return total_loss / total_samples
+
+
+def _make_loss_fn(config: TrainerConfig, device: torch.device) -> nn.Module:
+    normalized = config.loss_name.strip().lower()
+    if normalized == "bce":
+        if config.pos_weight is None:
+            return nn.BCEWithLogitsLoss()
+        pos_weight = torch.tensor(float(config.pos_weight), dtype=torch.float32, device=device)
+        return nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+    if normalized == "focal":
+        return FocalBCEWithLogitsLoss(gamma=config.focal_gamma)
+    raise ValueError(f"Unsupported loss_name '{config.loss_name}'.")
+
+
+class FocalBCEWithLogitsLoss(nn.Module):
+    """Binary focal loss built on top of BCE-with-logits."""
+
+    def __init__(self, gamma: float = 2.0, alpha: float | None = None) -> None:
+        super().__init__()
+        self.gamma = float(gamma)
+        self.alpha = alpha
+
+    def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        targets = targets.float()
+        bce = F.binary_cross_entropy_with_logits(logits, targets, reduction="none")
+        probs = torch.sigmoid(logits)
+        p_t = probs * targets + (1.0 - probs) * (1.0 - targets)
+        focal_factor = (1.0 - p_t).pow(self.gamma)
+        loss = bce * focal_factor
+
+        if self.alpha is not None:
+            alpha_t = self.alpha * targets + (1.0 - self.alpha) * (1.0 - targets)
+            loss = loss * alpha_t
+
+        return loss.mean()
 
 
 def _extract_metric_value(metrics: BinaryClassificationMetrics, metric_name: str) -> float:

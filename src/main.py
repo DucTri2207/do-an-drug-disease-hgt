@@ -58,6 +58,7 @@ def main() -> None:
         val_ratio=args.val_ratio,
         test_ratio=args.test_ratio,
         negative_ratio=args.negative_ratio,
+        hard_negative_ratio=args.hard_negative_ratio,
         random_seed=args.random_seed,
     )
     split_bundle, split_report = create_drug_disease_splits(processed_dataset, split_config)
@@ -70,6 +71,9 @@ def main() -> None:
         weight_decay=args.weight_decay,
         early_stopping_patience=args.early_stopping_patience,
         checkpoint_path=args.checkpoint_path,
+        loss_name=args.loss_name,
+        pos_weight=args.pos_weight,
+        focal_gamma=args.focal_gamma,
         artifact_metadata={
             "checkpoint_schema_version": 1,
             "model_type": args.model,
@@ -185,6 +189,7 @@ def _run_hgt_training(
             num_heads=args.hgt_heads,
             dropout=args.dropout,
             decoder_hidden_dims=tuple(args.hgt_decoder_hidden_dims),
+            decoder_mode=args.hgt_decoder_mode,
             activation=args.activation,
             use_layer_norm=not args.disable_layer_norm,
         ),
@@ -236,6 +241,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--val-ratio", type=float, default=0.15)
     parser.add_argument("--test-ratio", type=float, default=0.15)
     parser.add_argument("--negative-ratio", type=float, default=1.0)
+    parser.add_argument("--hard-negative-ratio", type=float, default=0.0)
     parser.add_argument(
         "--normalize-features",
         choices=("none", "zscore", "l2"),
@@ -245,6 +251,9 @@ def _build_arg_parser() -> argparse.ArgumentParser:
 
     parser.add_argument("--dropout", type=float, default=0.2)
     parser.add_argument("--activation", choices=("relu", "gelu"), default="gelu")
+    parser.add_argument("--loss-name", choices=("bce", "focal"), default="bce")
+    parser.add_argument("--pos-weight", type=float, default=None)
+    parser.add_argument("--focal-gamma", type=float, default=2.0)
     parser.add_argument(
         "--baseline-hidden-dims",
         type=int,
@@ -261,6 +270,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         nargs="+",
         default=(256, 128),
     )
+    parser.add_argument("--hgt-decoder-mode", choices=("product", "concat", "hybrid"), default="product")
     parser.add_argument("--disable-layer-norm", action="store_true")
     parser.add_argument("--disable-reverse-edges", action="store_true")
     parser.add_argument("--add-self-loops", action="store_true")

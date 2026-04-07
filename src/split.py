@@ -28,6 +28,7 @@ class SplitConfig:
     val_ratio: float = 0.15
     test_ratio: float = 0.15
     negative_ratio: float = 1.0
+    hard_negative_ratio: float = 0.0
     random_seed: int = 42
     deduplicate_positive_edges: bool = True
     stratify: bool = True
@@ -129,8 +130,11 @@ def create_drug_disease_splits(
     )
     negative_pairs = _sample_negative_pairs(
         unknown_pairs=unknown_pairs,
-        num_positive=positive_pairs.shape[0],
+        positive_pairs=positive_pairs,
+        num_drugs=num_drugs,
+        num_diseases=num_diseases,
         negative_ratio=config.negative_ratio,
+        hard_negative_ratio=config.hard_negative_ratio,
         random_seed=config.random_seed,
     )
 
@@ -212,6 +216,8 @@ def _validate_split_config(config: SplitConfig) -> None:
         )
     if config.negative_ratio <= 0:
         raise ValueError("negative_ratio must be positive.")
+    if config.hard_negative_ratio < 0 or config.hard_negative_ratio > 1:
+        raise ValueError("hard_negative_ratio must be in [0, 1].")
 
 
 def _set_random_seed(seed: int) -> None:
@@ -236,19 +242,76 @@ def _enumerate_unknown_pairs(
 
 def _sample_negative_pairs(
     unknown_pairs: np.ndarray,
-    num_positive: int,
+    positive_pairs: np.ndarray,
+    num_drugs: int,
+    num_diseases: int,
     negative_ratio: float,
+    hard_negative_ratio: float,
     random_seed: int,
 ) -> np.ndarray:
-    requested = int(round(num_positive * negative_ratio))
-    if requested > unknown_pairs.shape[0]:
+    requested_total = int(round(positive_pairs.shape[0] * negative_ratio))
+    if requested_total > unknown_pairs.shape[0]:
         raise ValueError(
-            f"Requested {requested} negatives but only {unknown_pairs.shape[0]} unknown pairs exist."
+            f"Requested {requested_total} negatives but only {unknown_pairs.shape[0]} unknown pairs exist."
         )
 
+    if hard_negative_ratio < 0 or hard_negative_ratio > 1:
+        raise ValueError("hard_negative_ratio must be in [0, 1].")
+
     rng = np.random.default_rng(random_seed)
-    sampled_indices = rng.choice(unknown_pairs.shape[0], size=requested, replace=False)
-    return unknown_pairs[sampled_indices]
+    requested_hard = int(round(requested_total * hard_negative_ratio))
+    requested_random = requested_total - requested_hard
+
+    if requested_hard == 0:
+        sampled_indices = rng.choice(unknown_pairs.shape[0], size=requested_total, replace=False)
+        return unknown_pairs[sampled_indices]
+
+    # hard negatives: pairs sharing drug or disease with positives
+    pos_drugs = set(positive_pairs[:, 0].tolist())
+    pos_diseases = set(positive_pairs[:, 1].tolist())
+
+    hard_mask = np.array(
+        [
+            (int(drug_idx) in pos_drugs) or (int(disease_idx) in pos_diseases)
+            for drug_idx, disease_idx in unknown_pairs.tolist()
+        ],
+        dtype=bool,
+    )
+    hard_candidates = unknown_pairs[hard_mask]
+    random_candidates = unknown_pairs[~hard_mask]
+
+    hard_take = min(requested_hard, hard_candidates.shape[0])
+    random_take = requested_total - hard_take
+
+    if random_take > random_candidates.shape[0]:
+        shortfall = random_take - random_candidates.shape[0]
+        random_take = random_candidates.shape[0]
+        hard_take = min(hard_take + shortfall, hard_candidates.shape[0])
+
+    hard_sample = (
+        hard_candidates[rng.choice(hard_candidates.shape[0], size=hard_take, replace=False)]
+        if hard_take > 0
+        else np.empty((0, 2), dtype=np.int64)
+    )
+    random_sample = (
+        random_candidates[rng.choice(random_candidates.shape[0], size=random_take, replace=False)]
+        if random_take > 0
+        else np.empty((0, 2), dtype=np.int64)
+    )
+
+    merged = np.vstack((hard_sample, random_sample))
+    if merged.shape[0] < requested_total:
+        remaining = requested_total - merged.shape[0]
+        used = set(map(tuple, merged.tolist()))
+        leftovers = [tuple(p) for p in unknown_pairs.tolist() if tuple(p) not in used]
+        if remaining > len(leftovers):
+            raise ValueError("Could not sample enough negative pairs.")
+        extra_idx = rng.choice(len(leftovers), size=remaining, replace=False)
+        extra = np.asarray([leftovers[i] for i in extra_idx], dtype=np.int64)
+        merged = np.vstack((merged, extra))
+
+    rng.shuffle(merged)
+    return merged
 
 
 def _stratified_train_val_test_split(
