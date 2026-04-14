@@ -160,6 +160,7 @@ def main() -> None:
         loss_name=args.loss_name,
         pos_weight=args.pos_weight,
         focal_gamma=args.focal_gamma,
+        emulate_paper_leakage=args.emulate_paper_leakage,
     )
 
     result_json_path = Path(args.result_json) if args.result_json is not None else None
@@ -254,6 +255,7 @@ def main() -> None:
             fold_split.train,
             fold_split.val,
             trainer_config,
+            test_pairs=fold_split.test,
         )
         test_metrics = evaluate_hgt_model(
             model,
@@ -378,6 +380,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--loss-name", choices=("bce", "focal"), default="bce")
     parser.add_argument("--pos-weight", type=float, default=None)
     parser.add_argument("--focal-gamma", type=float, default=2.0)
+    parser.add_argument("--emulate-paper-leakage", action="store_true")
+
     parser.add_argument("--hidden-dim", type=int, default=128)
     parser.add_argument("--hgt-layers", type=int, default=3)
     parser.add_argument("--hgt-heads", type=int, default=4)

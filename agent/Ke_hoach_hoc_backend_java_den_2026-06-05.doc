@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Kế hoạch học Backend Java đến 05/06/2026</title>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.45; }
+    h1, h2, h3 { color: #1f3c88; }
+    table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+    th, td { border: 1px solid #999; padding: 8px; vertical-align: top; }
+    th { background: #eef3ff; }
+    .phase { background: #f7f9ff; font-weight: bold; }
+    .small { font-size: 12px; color: #555; }
+  </style>
+</head>
+<body>
+  <h1>KẾ HOẠCH HỌC BACKEND JAVA ĐẾN 05/06/2026</h1>
+  <p><b>Xuất phát điểm:</b> Java Core cơ bản.</p>
+  <p><b>Mục tiêu:</b> Hoàn thiện kỹ năng Backend Java để đi thực tập + hoàn thành đồ án website Drug-Disease có tích hợp AI.</p>
+
+  <h2>1) Mục tiêu đầu ra</h2>
+  <ul>
+    <li>Backend Spring Boot có: Auth JWT, Role USER/ADMIN, CRUD Drug/Disease/Link, lịch sử tra cứu, thống kê.</li>
+    <li>Frontend có thể gọi API đầy đủ các chức năng chính.</li>
+    <li>Tích hợp AI service trả top-k dự đoán + score.</li>
+    <li>Hoàn thiện README + API docs + demo script.</li>
+  </ul>
+
+  <h2>2) Khung học mỗi ngày (3-5 giờ)</h2>
+  <ul>
+    <li>Block A (60-90'): học lý thuyết</li>
+    <li>Block B (90-120'): code bài luyện</li>
+    <li>Block C (60-90'): làm task dự án thật</li>
+    <li>Cuối ngày (10'): ghi nhật ký học tập</li>
+  </ul>
+
+  <h2>3) Lịch học chi tiết theo ngày</h2>
+  <table>
+    <tr><th>Ngày</th><th>Nội dung học + làm</th><th>Output bắt buộc</th></tr>
+
+    <tr class="phase"><td colspan="3">Giai đoạn 1: Nền tảng Java + SQL + REST (09/04 - 16/04)</td></tr>
+    <tr><td>09/04</td><td>Ôn Java OOP, Exception, Collections.</td><td>15 bài Java nhỏ + ghi chú ngày 1.</td></tr>
+    <tr><td>10/04</td><td>Stream, Lambda, Optional.</td><td>10 bài xử lý data bằng stream.</td></tr>
+    <tr><td>11/04</td><td>Maven, cấu trúc project Java chuẩn.</td><td>Project Maven chạy test thành công.</td></tr>
+    <tr><td>12/04</td><td>SQL cơ bản: SELECT, JOIN, GROUP BY.</td><td>20 câu SQL thực hành.</td></tr>
+    <tr><td>13/04</td><td>SQL nâng: index, transaction, normalization.</td><td>ERD nháp hệ thống đồ án.</td></tr>
+    <tr><td>14/04</td><td>HTTP/REST, status code, JSON contract.</td><td>1 trang API guideline.</td></tr>
+    <tr><td>15/04</td><td>Git/GitHub workflow (branch, commit, PR).</td><td>Mô phỏng 1 feature branch -> merge.</td></tr>
+    <tr><td>16/04</td><td>Tổng ôn + tự kiểm tra tuần 1.</td><td>Checklist năng lực tuần 1.</td></tr>
+
+    <tr class="phase"><td colspan="3">Giai đoạn 2: Spring Boot Core (17/04 - 27/04)</td></tr>
+    <tr><td>17/04</td><td>Spring Boot intro, DI, bean.</td><td>API hello/health chạy được.</td></tr>
+    <tr><td>18/04</td><td>Controller-Service-Repository pattern.</td><td>CRUD demo entity.</td></tr>
+    <tr><td>19/04</td><td>Spring Data JPA + PostgreSQL.</td><td>Kết nối DB thành công.</td></tr>
+    <tr><td>20/04</td><td>Validation + Global Exception Handler.</td><td>Format lỗi API thống nhất.</td></tr>
+    <tr><td>21/04</td><td>DTO + Mapper.</td><td>Refactor endpoint dùng DTO.</td></tr>
+    <tr><td>22/04</td><td>Pagination/Sorting/Filtering.</td><td>API list có page/size/sort.</td></tr>
+    <tr><td>23/04</td><td>Swagger/OpenAPI docs.</td><td>Docs API hiển thị đầy đủ.</td></tr>
+    <tr><td>24/04</td><td>JUnit + MockMvc test cơ bản.</td><td>5 test endpoint trọng yếu.</td></tr>
+    <tr><td>25/04</td><td>Chốt ERD final + migration v1.</td><td>ERD final + script DB.</td></tr>
+    <tr><td>26/04</td><td>Khởi tạo backend đồ án thật.</td><td>Project skeleton chuẩn.</td></tr>
+    <tr><td>27/04</td><td>Buffer fix/chốt tuần.</td><td>Không nợ task tuần 2.</td></tr>
+
+    <tr class="phase"><td colspan="3">Giai đoạn 3: Auth + nghiệp vụ chính (28/04 - 11/05)</td></tr>
+    <tr><td>28/04</td><td>Spring Security cơ bản.</td><td>Security config hoạt động.</td></tr>
+    <tr><td>29/04</td><td>JWT Register/Login.</td><td>/auth/register, /auth/login.</td></tr>
+    <tr><td>30/04</td><td>Role USER/ADMIN.</td><td>Phân quyền endpoint đúng 401/403.</td></tr>
+    <tr><td>01/05</td><td>CRUD Drug (admin).</td><td>API drug hoàn chỉnh.</td></tr>
+    <tr><td>02/05</td><td>CRUD Disease (admin).</td><td>API disease hoàn chỉnh.</td></tr>
+    <tr><td>03/05</td><td>CRUD Drug-Disease Link (admin).</td><td>API known links hoàn chỉnh.</td></tr>
+    <tr><td>04/05</td><td>Search API user.</td><td>Search theo tên/id có pagination.</td></tr>
+    <tr><td>05/05</td><td>Lịch sử tra cứu user.</td><td>API history + DB record.</td></tr>
+    <tr><td>06/05</td><td>Admin stats API.</td><td>Thống kê số lượt dự đoán.</td></tr>
+    <tr><td>07/05</td><td>Refactor clean code.</td><td>Giảm duplicated logic.</td></tr>
+    <tr><td>08/05</td><td>Test auth/permission.</td><td>Test pass cho case chính.</td></tr>
+    <tr><td>09/05</td><td>Test CRUD nghiệp vụ.</td><td>10 test endpoint quan trọng.</td></tr>
+    <tr><td>10/05</td><td>Buffer bug fix.</td><td>Backend ổn định.</td></tr>
+    <tr><td>11/05</td><td>Demo milestone backend.</td><td>Demo API đầy đủ chưa cần frontend đẹp.</td></tr>
+
+    <tr class="phase"><td colspan="3">Giai đoạn 4: Tích hợp AI (12/05 - 20/05)</td></tr>
+    <tr><td>12/05</td><td>Chốt API contract Java ↔ Python AI.</td><td>Spec request/response predict.</td></tr>
+    <tr><td>13/05</td><td>Dựng Python AI endpoint mock.</td><td>POST /predict trả top-k format chuẩn.</td></tr>
+    <tr><td>14/05</td><td>Java gọi AI service (WebClient/RestTemplate).</td><td>Backend nhận response AI.</td></tr>
+    <tr><td>15/05</td><td>Flow thuốc -> bệnh.</td><td>Endpoint dự đoán chạy thật.</td></tr>
+    <tr><td>16/05</td><td>Flow bệnh -> thuốc.</td><td>Endpoint chiều ngược chạy thật.</td></tr>
+    <tr><td>17/05</td><td>Lưu prediction + history vào DB.</td><td>Bản ghi lưu đủ score/top-k.</td></tr>
+    <tr><td>18/05</td><td>Cache kết quả (tùy chọn).</td><td>Giảm thời gian response truy vấn lặp.</td></tr>
+    <tr><td>19/05</td><td>Timeout/retry/fallback khi AI lỗi.</td><td>Không làm sập backend khi AI fail.</td></tr>
+    <tr><td>20/05</td><td>Review tích hợp end-to-end.</td><td>Demo backend + AI ổn định.</td></tr>
+
+    <tr class="phase"><td colspan="3">Giai đoạn 5: Frontend + kết nối API (21/05 - 29/05)</td></tr>
+    <tr><td>21/05</td><td>Khởi tạo frontend + router/layout.</td><td>Khung trang Login/User/Admin.</td></tr>
+    <tr><td>22/05</td><td>Login/logout + token management.</td><td>Đăng nhập/đăng xuất hoạt động.</td></tr>
+    <tr><td>23/05</td><td>UI tra cứu thuốc -> bệnh.</td><td>Hiển thị top-k + score.</td></tr>
+    <tr><td>24/05</td><td>UI tra cứu bệnh -> thuốc.</td><td>Hiển thị chiều ngược.</td></tr>
+    <tr><td>25/05</td><td>UI lịch sử tra cứu.</td><td>Bảng lịch sử có phân trang.</td></tr>
+    <tr><td>26/05</td><td>UI admin CRUD data.</td><td>Admin thao tác dữ liệu được.</td></tr>
+    <tr><td>27/05</td><td>UI admin thống kê.</td><td>Biểu đồ số lượt dự đoán.</td></tr>
+    <tr><td>28/05</td><td>Polish UX: loading/error/empty state.</td><td>UI mượt, dễ dùng.</td></tr>
+    <tr><td>29/05</td><td>Test full flow frontend-backend-ai.</td><td>Demo end-to-end hoàn chỉnh.</td></tr>
+
+    <tr class="phase"><td colspan="3">Giai đoạn 6: Chốt đồ án + sẵn sàng ứng tuyển (30/05 - 05/06)</td></tr>
+    <tr><td>30/05</td><td>README chuẩn kỹ sư.</td><td>Người lạ clone về chạy được.</td></tr>
+    <tr><td>31/05</td><td>Docs kỹ thuật (ERD, API, kiến trúc).</td><td>File docs hoàn chỉnh.</td></tr>
+    <tr><td>01/06</td><td>Bổ sung test critical path.</td><td>Tăng độ tin cậy endpoint chính.</td></tr>
+    <tr><td>02/06</td><td>Dockerize backend + db + ai.</td><td>docker compose chạy local.</td></tr>
+    <tr><td>03/06</td><td>Bug bash toàn hệ thống.</td><td>Fix hết blocker.</td></tr>
+    <tr><td>04/06</td><td>Chuẩn bị slide + script demo.</td><td>Kịch bản demo 5-8 phút.</td></tr>
+    <tr><td>05/06</td><td>Dry-run bảo vệ + đóng gói nộp.</td><td>Bản nộp ổn định, tự tin trình bày.</td></tr>
+  </table>
+
+  <h2>4) Checklist kỹ năng ứng tuyển Backend Java</h2>
+  <ul>
+    <li>[ ] Java OOP + Stream + Exception handling</li>
+    <li>[ ] Spring Boot REST API chuẩn tầng</li>
+    <li>[ ] Spring Security + JWT + RBAC</li>
+    <li>[ ] JPA + PostgreSQL + migration</li>
+    <li>[ ] Validation + Global Exception + Swagger</li>
+    <li>[ ] Tích hợp external service (AI)</li>
+    <li>[ ] Test endpoint chính</li>
+    <li>[ ] Git workflow + README rõ ràng</li>
+  </ul>
+
+  <h2>5) Lời khuyên để theo kịp tiến độ</h2>
+  <ol>
+    <li>Mỗi ngày bắt buộc có output chạy được (đừng học chay).</li>
+    <li>Mỗi tuần có demo mini để tự đánh giá tiến độ.</li>
+    <li>Kẹt quá 1 ngày thì cắt 20% scope, không bỏ milestone tuần.</li>
+    <li>Ưu tiên backend và hệ thống; AI chỉ cần tích hợp tốt.</li>
+  </ol>
+
+  <p class="small">Ghi chú: Tệp .doc này dùng định dạng HTML tương thích Word, mở trực tiếp bằng Microsoft Word.</p>
+</body>
+</html>

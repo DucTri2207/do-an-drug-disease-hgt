@@ -41,6 +41,7 @@ class TrainerConfig:
     loss_name: str = "bce"
     pos_weight: float | None = None
     focal_gamma: float = 2.0
+    emulate_paper_leakage: bool = False
     artifact_metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -74,6 +75,8 @@ def train_baseline_model(
     val_pair_features: torch.Tensor,
     val_labels: torch.Tensor,
     config: TrainerConfig = TrainerConfig(),
+    test_pair_features: torch.Tensor | None = None,
+    test_labels: torch.Tensor | None = None,
 ) -> TrainingResult:
     """Train the MLP baseline with early stopping on validation AUPR by default."""
 
@@ -127,10 +130,20 @@ def train_baseline_model(
             criterion=criterion,
             device=device,
         )
+
+        if config.emulate_paper_leakage:
+            if test_pair_features is None or test_labels is None:
+                raise ValueError("test features and labels must be provided if emulate_paper_leakage is True.")
+            eval_features = test_pair_features
+            eval_labels = test_labels
+        else:
+            eval_features = val_pair_features
+            eval_labels = val_labels
+
         val_metrics = evaluate_baseline_model(
             model=model,
-            pair_features=val_pair_features,
-            labels=val_labels,
+            pair_features=eval_features,
+            labels=eval_labels,
             batch_size=config.batch_size,
             device=device,
             loss_fn=criterion,
@@ -274,6 +287,7 @@ def train_hgt_model(
     train_pairs: PairDataset,
     val_pairs: PairDataset,
     config: TrainerConfig = TrainerConfig(),
+    test_pairs: PairDataset | None = None,
 ) -> TrainingResult:
     """Train the HGT model on the training graph with early stopping on validation."""
 
@@ -327,10 +341,18 @@ def train_hgt_model(
             criterion=criterion,
             device=device,
         )
+
+        if config.emulate_paper_leakage:
+            if test_pairs is None:
+                raise ValueError("test_pairs must be provided if emulate_paper_leakage is True.")
+            eval_pairs = test_pairs
+        else:
+            eval_pairs = val_pairs
+
         val_metrics = evaluate_hgt_model(
             model=model,
             graph=train_graph,
-            pairs=val_pairs,
+            pairs=eval_pairs,
             batch_size=config.batch_size,
             device=device,
             loss_fn=criterion,

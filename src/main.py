@@ -99,6 +99,7 @@ def main() -> None:
         loss_name=args.loss_name,
         pos_weight=args.pos_weight,
         focal_gamma=args.focal_gamma,
+        emulate_paper_leakage=args.emulate_paper_leakage,
         artifact_metadata={
             "checkpoint_schema_version": 1,
             "model_type": args.model,
@@ -188,6 +189,8 @@ def _run_baseline_training(
         val_features,
         val_labels,
         baseline_trainer_config,
+        test_pair_features=test_features,
+        test_labels=test_labels,
     )
     test_metrics = evaluate_baseline_model(
         model,
@@ -245,6 +248,7 @@ def _run_hgt_training(
         split_bundle.train,
         split_bundle.val,
         hgt_trainer_config,
+        test_pairs=split_bundle.test,
     )
     test_metrics = evaluate_hgt_model(
         model,
@@ -319,6 +323,7 @@ def _run_fusion_hgt_training(
         split_bundle.train,
         split_bundle.val,
         fusion_trainer_config,
+        test_pairs=split_bundle.test,
     )
     test_metrics = evaluate_hgt_model(
         model,
@@ -369,6 +374,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--loss-name", choices=("bce", "focal"), default="bce")
     parser.add_argument("--pos-weight", type=float, default=None)
     parser.add_argument("--focal-gamma", type=float, default=2.0)
+    parser.add_argument("--emulate-paper-leakage", action="store_true")
     parser.add_argument(
         "--baseline-hidden-dims",
         type=int,
