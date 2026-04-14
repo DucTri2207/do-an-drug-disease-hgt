@@ -28,16 +28,36 @@ try:
     from .data_loader import AVAILABLE_DATASETS, EdgeData, RawDataset, load_dataset
     from .evaluator import BinaryClassificationMetrics, summarize_metrics
     from .graph_builder import GraphBuildConfig, build_train_hetero_graph, summarize_graph_report
+    from .model_fusion_hgt import (
+        FusionHGTModelConfig,
+        build_fusion_hgt_model,
+        summarize_fusion_hgt_model,
+    )
     from .model_hgt import HGTModelConfig, build_hgt_model, summarize_hgt_model
     from .preprocess import PreprocessConfig, preprocess_dataset
+    from .similarity_graph import (
+        SimilarityGraphConfig,
+        build_similarity_graph_bundle,
+        summarize_similarity_graph_bundle,
+    )
     from .split import DrugDiseaseSplit, PairDataset, SplitConfig
     from .trainer import TrainerConfig, evaluate_hgt_model, summarize_training_result, train_hgt_model
 except ImportError:  # pragma: no cover - allows direct script execution
     from data_loader import AVAILABLE_DATASETS, EdgeData, RawDataset, load_dataset
     from evaluator import BinaryClassificationMetrics, summarize_metrics
     from graph_builder import GraphBuildConfig, build_train_hetero_graph, summarize_graph_report
+    from model_fusion_hgt import (
+        FusionHGTModelConfig,
+        build_fusion_hgt_model,
+        summarize_fusion_hgt_model,
+    )
     from model_hgt import HGTModelConfig, build_hgt_model, summarize_hgt_model
     from preprocess import PreprocessConfig, preprocess_dataset
+    from similarity_graph import (
+        SimilarityGraphConfig,
+        build_similarity_graph_bundle,
+        summarize_similarity_graph_bundle,
+    )
     from split import DrugDiseaseSplit, PairDataset, SplitConfig
     from trainer import TrainerConfig, evaluate_hgt_model, summarize_training_result, train_hgt_model
 
@@ -66,11 +86,17 @@ def main() -> None:
     )
     processed_dataset, preprocess_report = preprocess_dataset(dataset, preprocess_config)
 
+    resolved_hard_negative_ratio = (
+        0.5 if args.model == "fusion_hgt" and args.hard_negative_ratio is None else args.hard_negative_ratio
+    )
+    if resolved_hard_negative_ratio is None:
+        resolved_hard_negative_ratio = 0.0
+
     kfold_config = KFoldConfig(
         folds=args.folds,
         val_ratio_within_train=args.val_ratio_within_train,
         negative_ratio=args.negative_ratio,
-        hard_negative_ratio=args.hard_negative_ratio,
+        hard_negative_ratio=resolved_hard_negative_ratio,
         random_seed=args.random_seed,
     )
     _validate_kfold_config(kfold_config)
@@ -87,7 +113,19 @@ def main() -> None:
         add_reverse_edges=not args.disable_reverse_edges,
         add_self_loops=args.add_self_loops,
     )
-    model_config = HGTModelConfig(
+    similarity_graphs = None
+    similarity_summary = None
+    if args.model == "fusion_hgt":
+        similarity_graphs = build_similarity_graph_bundle(
+            processed_dataset,
+            SimilarityGraphConfig(
+                top_k=args.similarity_topk,
+                symmetric=not args.disable_similarity_symmetry,
+            ),
+        )
+        similarity_summary = summarize_similarity_graph_bundle(similarity_graphs)
+
+    hgt_model_config = HGTModelConfig(
         hidden_dim=args.hidden_dim,
         num_layers=args.hgt_layers,
         num_heads=args.hgt_heads,
@@ -96,6 +134,21 @@ def main() -> None:
         decoder_mode=args.hgt_decoder_mode,
         activation=args.activation,
         use_layer_norm=not args.disable_layer_norm,
+    )
+    fusion_model_config = FusionHGTModelConfig(
+        hidden_dim=args.hidden_dim,
+        num_layers=args.hgt_layers,
+        num_heads=args.hgt_heads,
+        dropout=args.dropout,
+        decoder_hidden_dims=tuple(args.hgt_decoder_hidden_dims),
+        decoder_mode=args.hgt_decoder_mode,
+        activation=args.activation,
+        use_layer_norm=not args.disable_layer_norm,
+        similarity_topk=args.similarity_topk,
+        sim_layers=args.sim_layers,
+        sim_heads=args.sim_heads,
+        sim_dropout=args.sim_dropout,
+        symmetric_similarity=not args.disable_similarity_symmetry,
     )
     trainer_config_base = TrainerConfig(
         device=args.device,
@@ -159,7 +212,15 @@ def main() -> None:
             fold_split,
             graph_config,
         )
-        model = build_hgt_model(processed_dataset, train_graph, model_config)
+        if args.model == "fusion_hgt":
+            model = build_fusion_hgt_model(
+                processed_dataset,
+                train_graph,
+                similarity_graphs,
+                fusion_model_config,
+            )
+        else:
+            model = build_hgt_model(processed_dataset, train_graph, hgt_model_config)
 
         checkpoint_path = None
         if checkpoint_dir is not None:
@@ -169,7 +230,7 @@ def main() -> None:
         trainer_config_payload["checkpoint_path"] = checkpoint_path
         trainer_config_payload["artifact_metadata"] = {
             "checkpoint_schema_version": 1,
-            "model_type": "hgt",
+            "model_type": args.model,
             "protocol": "kfold_cross_validation",
             "dataset_name": processed_dataset.dataset_name,
             "fold_index": fold_index,
@@ -177,6 +238,8 @@ def main() -> None:
             "preprocess_config": asdict(preprocess_config),
             "graph_build_config": asdict(graph_config),
         }
+        if similarity_summary is not None:
+            trainer_config_payload["artifact_metadata"]["similarity_graph_config"] = similarity_summary["config"]
         trainer_config = TrainerConfig(**trainer_config_payload)
 
         print(
@@ -220,6 +283,8 @@ def main() -> None:
             "training": summarize_training_result(training_result),
             "test_metrics": summarize_metrics(test_metrics),
         }
+        if similarity_summary is not None:
+            fold_report["similarity_graphs"] = similarity_summary
         fold_reports.append(fold_report)
         print(
             f"[Fold {fold_index}/{kfold_config.folds}] "
@@ -232,7 +297,7 @@ def main() -> None:
     aggregate_test_metrics = _aggregate_metrics(fold_test_metrics)
     payload = {
         "dataset": processed_dataset.dataset_name,
-        "model": "hgt",
+        "model": args.model,
         "protocol": {
             "name": "outer_stratified_kfold_with_inner_validation",
             "notes": (
@@ -251,16 +316,11 @@ def main() -> None:
             "total_unknown_pairs": int(unknown_pairs.shape[0]),
             "sampled_negative_pairs": int(negative_pairs.shape[0]),
         },
-        "model_config": {
-            "hidden_dim": model_config.hidden_dim,
-            "num_layers": model_config.num_layers,
-            "num_heads": model_config.num_heads,
-            "dropout": model_config.dropout,
-            "decoder_hidden_dims": list(model_config.decoder_hidden_dims),
-            "decoder_mode": model_config.decoder_mode,
-            "activation": model_config.activation,
-            "use_layer_norm": model_config.use_layer_norm,
-        },
+        "model_config": (
+            summarize_hgt_model(model)
+            if args.model == "hgt"
+            else summarize_fusion_hgt_model(model)
+        ),
         "trainer_config": {
             "device": trainer_config_base.device,
             "epochs": trainer_config_base.epochs,
@@ -276,6 +336,8 @@ def main() -> None:
         "aggregate_test_metrics": aggregate_test_metrics,
         "total_elapsed_seconds": total_elapsed_seconds,
     }
+    if similarity_summary is not None:
+        payload["similarity_graphs"] = similarity_summary
 
     print(json.dumps(payload["aggregate_test_metrics"], indent=2))
     if result_json_path is not None:
@@ -287,8 +349,9 @@ def main() -> None:
 
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Run HGT drug-disease link prediction with outer k-fold cross-validation.",
+        description="Run HGT or fusion-HGT drug-disease link prediction with outer k-fold cross-validation.",
     )
+    parser.add_argument("--model", choices=("hgt", "fusion_hgt"), default="hgt")
     parser.add_argument("--dataset", choices=AVAILABLE_DATASETS, default="C-dataset")
     parser.add_argument("--data-root", default="data")
     parser.add_argument("--device", default=None)
@@ -303,7 +366,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--folds", type=int, default=10)
     parser.add_argument("--val-ratio-within-train", type=float, default=0.1)
     parser.add_argument("--negative-ratio", type=float, default=1.0)
-    parser.add_argument("--hard-negative-ratio", type=float, default=0.0)
+    parser.add_argument("--hard-negative-ratio", type=float, default=None)
     parser.add_argument(
         "--normalize-features",
         choices=("none", "zscore", "l2"),
@@ -328,6 +391,11 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--disable-layer-norm", action="store_true")
     parser.add_argument("--disable-reverse-edges", action="store_true")
     parser.add_argument("--add-self-loops", action="store_true")
+    parser.add_argument("--similarity-topk", type=int, default=20)
+    parser.add_argument("--sim-layers", type=int, default=2)
+    parser.add_argument("--sim-heads", type=int, default=4)
+    parser.add_argument("--sim-dropout", type=float, default=0.2)
+    parser.add_argument("--disable-similarity-symmetry", action="store_true")
     return parser
 
 

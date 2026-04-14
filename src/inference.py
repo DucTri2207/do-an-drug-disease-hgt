@@ -33,8 +33,13 @@ try:
         build_train_hetero_graph,
         summarize_graph_report,
     )
+    from .model_fusion_hgt import (
+        DrugDiseaseFusionHGT,
+        FusionHGTModelConfig,
+    )
     from .model_hgt import DrugDiseaseHGT, HGTModelConfig
     from .preprocess import NormalizeMode, PreprocessConfig, preprocess_dataset
+    from .similarity_graph import SimilarityGraphConfig, build_similarity_graph_bundle
     from .split import SplitConfig, create_drug_disease_splits
     from .trainer import resolve_device
 except ImportError:  # pragma: no cover - allows direct script execution
@@ -59,13 +64,18 @@ except ImportError:  # pragma: no cover - allows direct script execution
         build_train_hetero_graph,
         summarize_graph_report,
     )
+    from model_fusion_hgt import (
+        DrugDiseaseFusionHGT,
+        FusionHGTModelConfig,
+    )
     from model_hgt import DrugDiseaseHGT, HGTModelConfig
     from preprocess import NormalizeMode, PreprocessConfig, preprocess_dataset
+    from similarity_graph import SimilarityGraphConfig, build_similarity_graph_bundle
     from split import SplitConfig, create_drug_disease_splits
     from trainer import resolve_device
 
 
-ModelType = Literal["baseline", "hgt"]
+ModelType = Literal["baseline", "hgt", "fusion_hgt"]
 GraphMode = Literal["none", "train", "full"]
 
 
@@ -208,7 +218,12 @@ def load_inference_session(
         else:
             raise ValueError(f"HGT inference requires graph_mode 'train' or 'full', got '{resolved_graph_mode}'.")
 
-        model = _load_hgt_model(payload, processed_dataset, graph)
+        if resolved_model_type == "fusion_hgt":
+            similarity_config = _resolve_similarity_graph_config(payload)
+            similarity_graphs = build_similarity_graph_bundle(processed_dataset, similarity_config)
+            model = _load_fusion_hgt_model(payload, processed_dataset, graph, similarity_graphs)
+        else:
+            model = _load_hgt_model(payload, processed_dataset, graph)
         graph = graph.to(device)
 
     model = model.to(device)
@@ -457,7 +472,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         description="Run deployment-oriented top-k inference for trained drug-disease models.",
     )
     parser.add_argument("--checkpoint-path", required=True)
-    parser.add_argument("--model", choices=("baseline", "hgt"), default=None)
+    parser.add_argument("--model", choices=("baseline", "hgt", "fusion_hgt"), default=None)
     parser.add_argument("--dataset", choices=AVAILABLE_DATASETS, default=None)
     parser.add_argument("--data-root", default="data")
     parser.add_argument("--drug-query", required=True)
@@ -487,10 +502,12 @@ def _resolve_model_type(
         return explicit_model_type
 
     artifact_metadata = payload.get("artifact_metadata", {})
-    if artifact_metadata.get("model_type") in {"baseline", "hgt"}:
+    if artifact_metadata.get("model_type") in {"baseline", "hgt", "fusion_hgt"}:
         return artifact_metadata["model_type"]
 
     model_class = str(payload.get("model_class", "")).casefold()
+    if "fusion" in model_class:
+        return "fusion_hgt"
     if "hgt" in model_class:
         return "hgt"
     if "baseline" in model_class or "mlp" in model_class:
@@ -593,6 +610,38 @@ def _load_hgt_model(
     )
     model.load_state_dict(payload["model_state_dict"])
     return model
+
+
+def _load_fusion_hgt_model(
+    payload: dict[str, Any],
+    dataset: RawDataset,
+    graph: Any,
+    similarity_graphs,
+) -> DrugDiseaseFusionHGT:
+    model_config = dict(payload.get("model_config", {}))
+    input_dims = payload.get("input_dims", dataset.feature_dims)
+    model = DrugDiseaseFusionHGT(
+        metadata=graph.metadata(),
+        input_dims=input_dims,
+        similarity_graphs=similarity_graphs,
+        config=FusionHGTModelConfig(**model_config),
+    )
+    model.load_state_dict(payload["model_state_dict"])
+    return model
+
+
+def _resolve_similarity_graph_config(payload: dict[str, Any]) -> SimilarityGraphConfig:
+    artifact_metadata = payload.get("artifact_metadata", {})
+    saved_config = artifact_metadata.get("similarity_graph_config", {})
+    model_config = payload.get("model_config", {})
+    return SimilarityGraphConfig(
+        top_k=int(saved_config.get("top_k", model_config.get("similarity_topk", 20))),
+        symmetric=bool(saved_config.get("symmetric", model_config.get("symmetric_similarity", True))),
+        drug_fingerprint_weight=float(model_config.get("drug_fingerprint_weight", 0.5)),
+        drug_gip_weight=float(model_config.get("drug_gip_weight", 0.5)),
+        disease_ps_weight=float(model_config.get("disease_ps_weight", 0.5)),
+        disease_gip_weight=float(model_config.get("disease_gip_weight", 0.5)),
+    )
 
 
 def _build_known_drug_disease_mask(dataset: RawDataset) -> np.ndarray:

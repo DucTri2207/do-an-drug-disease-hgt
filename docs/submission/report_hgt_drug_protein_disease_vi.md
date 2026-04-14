@@ -12,13 +12,20 @@ Giảng viên hướng dẫn: ..................................................
 
 Ngày nộp: 14/04/2026
 
+## 0. Phân biệt repo của nhóm và repo gốc
+
+- Repo của nhóm: https://github.com/DucTri2207/do-an-drug-disease-hgt
+- Repo gốc để tham chiếu: https://github.com/JK-Liu7/AMDGT
+
+Trong báo cáo này, khi nói “repo của nhóm” là nói đến repo `do-an-drug-disease-hgt`. Khi nói “repo gốc” hoặc “repo AMDGT” là nói đến repo `JK-Liu7/AMDGT`.
+
 ## 1. Tóm tắt đề tài
 
 Đề tài của nhóm thuộc bài toán dự đoán liên kết thuốc - bệnh trên đồ thị dị thể. Mục tiêu là dùng trí tuệ nhân tạo để học từ các quan hệ đã biết giữa thuốc, protein và bệnh, sau đó gợi ý các liên kết thuốc - bệnh mới. Hướng làm này phù hợp với bài toán drug repositioning, tức là tìm công dụng mới cho thuốc đã có.
 
-Sau khi đối chiếu paper, repo AMDGT và code hiện tại của nhóm, cách kết luận an toàn nhất là chia làm ba tầng. Tầng nền tảng kiến trúc là Heterogeneous Graph Transformer, gọi tắt là HGT. Tầng tham chiếu trực tiếp là AMDGT, là công trình dùng dữ liệu Drug - Protein - Disease và kết hợp nhiều nhánh đồ thị. Tầng triển khai hiện tại của nhóm là phiên bản HGT-only bằng PyG, có thêm baseline MLP, có chia train/val/test rõ ràng, có inference top-k và có dashboard demo.
+Sau khi đối chiếu paper, repo gốc AMDGT và code hiện tại trong repo của nhóm, cách kết luận an toàn nhất là chia làm ba tầng. Tầng nền tảng kiến trúc là Heterogeneous Graph Transformer, gọi tắt là HGT. Tầng tham chiếu trực tiếp là AMDGT, là công trình dùng dữ liệu Drug - Protein - Disease và kết hợp nhiều nhánh đồ thị. Tầng triển khai hiện tại của nhóm là phiên bản HGT-only bằng PyG, có thêm baseline MLP, có chia train/val/test rõ ràng, có inference top-k và có dashboard demo.
 
-Nói ngắn gọn, repo hiện tại không phải là bản sao nguyên xi của paper AMDGT. Nhóm đang giữ phần lõi hợp lý nhất cho mức đồ án cơ sở, đồng thời làm lại pipeline theo hướng sạch hơn và dễ giải thích hơn.
+Nói ngắn gọn, repo của nhóm không phải là bản sao nguyên xi của paper AMDGT. Nhóm đang giữ phần lõi hợp lý nhất cho mức đồ án cơ sở, đồng thời làm lại pipeline theo hướng sạch hơn và dễ giải thích hơn.
 
 ## 2. Bối cảnh và lý do chọn đề tài
 
@@ -65,14 +72,14 @@ HGT là Transformer dành cho heterogeneous graph. Điểm mạnh của HGT là 
 Trong đề tài này, không nên nói đơn giản rằng chỉ có một mô hình gốc duy nhất. Cách nói an toàn và đúng logic hơn là phân ra ba tầng:
 
 - Mô hình gốc nền tảng: Heterogeneous Graph Transformer, tức HGT.
-- Mô hình tham chiếu trực tiếp từ bài báo và repo dữ liệu: AMDGT.
+- Mô hình tham chiếu trực tiếp từ bài báo và repo gốc: AMDGT.
 - Mô hình nhóm đang triển khai hiện tại: biến thể HGT-only bằng PyG.
 
 ### 5.2 Vì sao kết luận như vậy
 
 HGT là nền tảng kiến trúc vì paper HGT gốc được xây dựng cho heterogeneous graph và rất phù hợp với bài toán có nhiều loại nút, nhiều loại cạnh. Trong khi đó, AMDGT là công trình gần nhất với đề tài của nhóm vì dùng đúng bài toán dự đoán liên kết thuốc - bệnh trên mạng Drug - Protein - Disease, đồng thời sử dụng các bộ dữ liệu và các loại feature tương tự.
 
-Tuy nhiên, repo hiện tại của nhóm không triển khai đầy đủ toàn bộ kiến trúc AMDGT. Thay vào đó, nhóm giữ phần lõi là HGT để xây pipeline sạch, dễ chạy và dễ bảo vệ hơn. Vì vậy, cách nói đúng là repo hiện tại là một phiên bản triển khai lại theo tinh thần của bài toán AMDGT nhưng rút gọn về lõi HGT.
+Tuy nhiên, repo của nhóm không triển khai đầy đủ toàn bộ kiến trúc AMDGT. Thay vào đó, nhóm giữ phần lõi là HGT để xây pipeline sạch, dễ chạy và dễ bảo vệ hơn. Vì vậy, cách nói đúng là repo của nhóm là một phiên bản triển khai lại theo tinh thần của bài toán AMDGT nhưng rút gọn về lõi HGT.
 
 ## 6. Mô hình tham chiếu từ paper AMDGT
 
@@ -90,7 +97,7 @@ Sau đó, AMDGT dùng nhiều nhánh transformer để học embedding từ các
 
 ### 7.1 Mục tiêu của repo
 
-Repo hiện tại tập trung xây một pipeline hoàn chỉnh cho đồ án cơ sở. Mục tiêu không phải sao chép toàn bộ AMDGT, mà là làm được phần cốt lõi, chạy được, đánh giá được và có thể demo được.
+Repo của nhóm tại `DucTri2207/do-an-drug-disease-hgt` tập trung xây một pipeline hoàn chỉnh cho đồ án cơ sở. Mục tiêu không phải sao chép toàn bộ AMDGT, mà là làm được phần cốt lõi, chạy được, đánh giá được và có thể demo được.
 
 ### 7.2 Dữ liệu đang dùng
 
@@ -223,7 +230,7 @@ Trong giai đoạn sau, nhóm có thể phát triển theo các hướng sau:
 
 ## 13. Kết luận
 
-Kết luận quan trọng nhất của báo cáo này là: repo hiện tại không phải là bản sao nguyên xi của paper AMDGT. Cách hiểu đúng hơn là nhóm đang triển khai một biến thể HGT-only trên cùng bài toán và cùng hệ dữ liệu Drug - Protein - Disease.
+Kết luận quan trọng nhất của báo cáo này là: repo của nhóm không phải là bản sao nguyên xi của paper AMDGT. Cách hiểu đúng hơn là nhóm đang triển khai một biến thể HGT-only trên cùng bài toán và cùng hệ dữ liệu Drug - Protein - Disease.
 
 Nếu cần trả lời ngắn trước giảng viên, nhóm có thể nói theo chuỗi sau: HGT là mô hình nền tảng, AMDGT là công trình tham chiếu trực tiếp, còn repo hiện tại là phiên bản triển khai lõi HGT của nhóm. Cách làm này hợp lý vì vừa bám đúng bài toán, vừa phù hợp mức đồ án cơ sở, đồng thời giúp pipeline rõ ràng, dễ kiểm soát và dễ demo hơn.
 
@@ -231,6 +238,6 @@ Nếu cần trả lời ngắn trước giảng viên, nhóm có thể nói theo
 
 - Paper HGT: Heterogeneous Graph Transformer
 - Paper AMDGT: Attention-aware multimodal dual graph transformers for disease-drug association prediction
-- Repo AMDGT: https://github.com/JK-Liu7/AMDGT
-- Repo hiện tại của nhóm: mã nguồn local tại thư mục src, dashboard và results
+- Repo AMDGT gốc: https://github.com/JK-Liu7/AMDGT
+- Repo của nhóm: https://github.com/DucTri2207/do-an-drug-disease-hgt
 

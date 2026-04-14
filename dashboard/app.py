@@ -190,7 +190,7 @@ def render_inference() -> None:
     if mode == "Chỉnh tay":
         colm1, colm2, colm3 = st.columns(3)
         with colm1:
-            model_type = st.selectbox("Loại model", ["hgt", "baseline"], index=0)
+            model_type = st.selectbox("Loại model", ["hgt", "fusion_hgt", "baseline"], index=0)
         with colm2:
             dataset_name = st.selectbox("Dataset", ["B-dataset", "C-dataset", "F-dataset"], index=1)
         with colm3:

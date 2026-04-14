@@ -13,8 +13,18 @@ try:
     from .data_loader import AVAILABLE_DATASETS, load_dataset
     from .evaluator import summarize_metrics
     from .graph_builder import GraphBuildConfig, build_train_hetero_graph, summarize_graph_report
+    from .model_fusion_hgt import (
+        FusionHGTModelConfig,
+        build_fusion_hgt_model,
+        summarize_fusion_hgt_model,
+    )
     from .model_hgt import HGTModelConfig, build_hgt_model, summarize_hgt_model
     from .preprocess import PreprocessConfig, preprocess_dataset
+    from .similarity_graph import (
+        SimilarityGraphConfig,
+        build_similarity_graph_bundle,
+        summarize_similarity_graph_bundle,
+    )
     from .split import SplitConfig, create_drug_disease_splits, summarize_split_report
     from .trainer import (
         TrainerConfig,
@@ -29,8 +39,18 @@ except ImportError:  # pragma: no cover - allows `python src/main.py`
     from data_loader import AVAILABLE_DATASETS, load_dataset
     from evaluator import summarize_metrics
     from graph_builder import GraphBuildConfig, build_train_hetero_graph, summarize_graph_report
+    from model_fusion_hgt import (
+        FusionHGTModelConfig,
+        build_fusion_hgt_model,
+        summarize_fusion_hgt_model,
+    )
     from model_hgt import HGTModelConfig, build_hgt_model, summarize_hgt_model
     from preprocess import PreprocessConfig, preprocess_dataset
+    from similarity_graph import (
+        SimilarityGraphConfig,
+        build_similarity_graph_bundle,
+        summarize_similarity_graph_bundle,
+    )
     from split import SplitConfig, create_drug_disease_splits, summarize_split_report
     from trainer import (
         TrainerConfig,
@@ -53,12 +73,17 @@ def main() -> None:
     )
     processed_dataset, preprocess_report = preprocess_dataset(dataset, preprocess_config)
 
+    if args.hard_negative_ratio is None:
+        resolved_hard_negative_ratio = 0.5 if args.model == "fusion_hgt" else 0.0
+    else:
+        resolved_hard_negative_ratio = args.hard_negative_ratio
+
     split_config = SplitConfig(
         train_ratio=args.train_ratio,
         val_ratio=args.val_ratio,
         test_ratio=args.test_ratio,
         negative_ratio=args.negative_ratio,
-        hard_negative_ratio=args.hard_negative_ratio,
+        hard_negative_ratio=resolved_hard_negative_ratio,
         random_seed=args.random_seed,
     )
     split_bundle, split_report = create_drug_disease_splits(processed_dataset, split_config)
@@ -101,7 +126,7 @@ def main() -> None:
             args,
         )
         run_summary["model_config"] = asdict(model.config)
-    else:
+    elif args.model == "hgt":
         model, training_result, test_metrics, graph_report = _run_hgt_training(
             processed_dataset,
             split_bundle,
@@ -110,6 +135,16 @@ def main() -> None:
         )
         run_summary["model_config"] = summarize_hgt_model(model)
         run_summary["train_graph"] = summarize_graph_report(graph_report)
+    else:
+        model, training_result, test_metrics, graph_report, similarity_summary = _run_fusion_hgt_training(
+            processed_dataset,
+            split_bundle,
+            trainer_config,
+            args,
+        )
+        run_summary["model_config"] = summarize_fusion_hgt_model(model)
+        run_summary["train_graph"] = summarize_graph_report(graph_report)
+        run_summary["similarity_graphs"] = similarity_summary
 
     run_summary["training"] = summarize_training_result(training_result)
     run_summary["test_metrics"] = summarize_metrics(test_metrics)
@@ -221,11 +256,91 @@ def _run_hgt_training(
     return model, training_result, test_metrics, graph_report
 
 
+def _run_fusion_hgt_training(
+    dataset,
+    split_bundle,
+    trainer_config: TrainerConfig,
+    args,
+):
+    graph_config = GraphBuildConfig(
+        add_reverse_edges=not args.disable_reverse_edges,
+        add_self_loops=args.add_self_loops,
+    )
+    train_graph, graph_report = build_train_hetero_graph(
+        dataset,
+        split_bundle,
+        graph_config,
+    )
+    similarity_graphs = build_similarity_graph_bundle(
+        dataset,
+        SimilarityGraphConfig(
+            top_k=args.similarity_topk,
+            symmetric=not args.disable_similarity_symmetry,
+        ),
+    )
+
+    model = build_fusion_hgt_model(
+        dataset,
+        train_graph,
+        similarity_graphs,
+        FusionHGTModelConfig(
+            hidden_dim=args.hidden_dim,
+            num_layers=args.hgt_layers,
+            num_heads=args.hgt_heads,
+            dropout=args.dropout,
+            decoder_hidden_dims=tuple(args.hgt_decoder_hidden_dims),
+            decoder_mode=args.hgt_decoder_mode,
+            activation=args.activation,
+            use_layer_norm=not args.disable_layer_norm,
+            similarity_topk=args.similarity_topk,
+            sim_layers=args.sim_layers,
+            sim_heads=args.sim_heads,
+            sim_dropout=args.sim_dropout,
+            symmetric_similarity=not args.disable_similarity_symmetry,
+        ),
+    )
+
+    fusion_trainer_config = replace(
+        trainer_config,
+        artifact_metadata={
+            **trainer_config.artifact_metadata,
+            "graph_mode": "train",
+            "graph_build_config": asdict(graph_config),
+            "similarity_graph_config": {
+                "top_k": args.similarity_topk,
+                "symmetric": not args.disable_similarity_symmetry,
+            },
+        },
+    )
+
+    training_result = train_hgt_model(
+        model,
+        train_graph,
+        split_bundle.train,
+        split_bundle.val,
+        fusion_trainer_config,
+    )
+    test_metrics = evaluate_hgt_model(
+        model,
+        train_graph,
+        split_bundle.test,
+        batch_size=trainer_config.batch_size,
+        device=trainer_config.device,
+    )
+    return (
+        model,
+        training_result,
+        test_metrics,
+        graph_report,
+        summarize_similarity_graph_bundle(similarity_graphs),
+    )
+
+
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Train baseline or HGT models for drug-disease link prediction.",
+        description="Train baseline, HGT, or fusion-HGT models for drug-disease link prediction.",
     )
-    parser.add_argument("--model", choices=("baseline", "hgt"), default="baseline")
+    parser.add_argument("--model", choices=("baseline", "hgt", "fusion_hgt"), default="baseline")
     parser.add_argument("--dataset", choices=AVAILABLE_DATASETS, default="C-dataset")
     parser.add_argument("--data-root", default="data")
     parser.add_argument("--device", default=None)
@@ -241,7 +356,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--val-ratio", type=float, default=0.15)
     parser.add_argument("--test-ratio", type=float, default=0.15)
     parser.add_argument("--negative-ratio", type=float, default=1.0)
-    parser.add_argument("--hard-negative-ratio", type=float, default=0.0)
+    parser.add_argument("--hard-negative-ratio", type=float, default=None)
     parser.add_argument(
         "--normalize-features",
         choices=("none", "zscore", "l2"),
@@ -274,6 +389,11 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--disable-layer-norm", action="store_true")
     parser.add_argument("--disable-reverse-edges", action="store_true")
     parser.add_argument("--add-self-loops", action="store_true")
+    parser.add_argument("--similarity-topk", type=int, default=20)
+    parser.add_argument("--sim-layers", type=int, default=2)
+    parser.add_argument("--sim-heads", type=int, default=4)
+    parser.add_argument("--sim-dropout", type=float, default=0.2)
+    parser.add_argument("--disable-similarity-symmetry", action="store_true")
     return parser
 
 
